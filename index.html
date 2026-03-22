@@ -373,8 +373,9 @@
     }
     
     ipcRenderer.on('mouse-pos', (event, { x, y, bounds }) => {
-      const ballCenterX = bounds.x + bounds.width / 2;
-      const ballCenterY = bounds.y + bounds.height / 2;
+      const ballRect = ball.getBoundingClientRect();
+      const ballCenterX = bounds.x + ballRect.left + ballRect.width / 2;
+      const ballCenterY = bounds.y + ballRect.top + ballRect.height / 2;
       const distance = getDistance(ballCenterX, ballCenterY, x, y);
       const isInputFocused = document.activeElement === inputBox || document.activeElement === modelSelect;
       const mouseOverInput = isMouseOverInputArea(x, y, bounds);
