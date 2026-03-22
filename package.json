@@ -1,0 +1,9 @@
+{
+  "name": "floating-ball",
+  "version": "1.0.0",
+  "description": "桌面悬浮球 - 鼠标接近时缓慢旋转",
+  "main": "main.js",
+  "dependencies": {
+    "electron": "^41.0.3"
+  }
+}

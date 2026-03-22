@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>悬浮球</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { 
+      width: 100%; 
+      height: 100%; 
+      background: transparent; 
+      overflow: hidden;
+    }
+    
+    .ball-container {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .ball {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, rgba(102, 126, 234, 0) 0%, rgba(102, 126, 234, 0.5) 40%, #667eea 100%);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      box-shadow: 0 0 20px rgba(102, 126, 234, 0.6),
+                  0 0 40px rgba(102, 126, 234, 0.3),
+                  0 4px 15px rgba(102, 126, 234, 0.5),
+                  inset 0 -3px 10px rgba(0,0,0,0.2),
+                  inset 0 3px 10px rgba(255,255,255,0.25);
+      transition: transform 0.1s ease-out;
+    }
+    
+    .ball.rotating {
+      animation: rotate 3s linear infinite;
+    }
+    
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    .ripple-wrapper {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .ripple-wrapper.active {
+      opacity: 1;
+    }
+    
+    .ripple {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) scale(0.5);
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: 2px solid rgba(102, 126, 234, 0.7);
+      box-shadow: 0 0 12px rgba(102, 126, 234, 0.4);
+      opacity: 0;
+    }
+    
+    .ripple-wrapper.active .ripple {
+      animation: ripple-expand 1.5s ease-out infinite;
+    }
+    
+    .ripple-wrapper.active .ripple:nth-child(2) { animation-delay: 0.3s; }
+    .ripple-wrapper.active .ripple:nth-child(3) { animation-delay: 0.6s; }
+    .ripple-wrapper.active .ripple:nth-child(4) { animation-delay: 0.9s; }
+    
+    @keyframes ripple-expand {
+      0% {
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 0.8;
+      }
+      100% {
+        transform: translate(-50%, -50%) scale(2.2);
+        opacity: 0;
+      }
+    }
+    
+    .widget-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 0 15px;
+      gap: 12px;
+    }
+    
+    .input-box {
+      width: 100px;
+      height: 28px;
+      padding: 0 12px;
+      border-radius: 14px;
+      border: 2px solid rgba(102, 126, 234, 0.65);
+      background: rgba(252, 252, 255, 0.96);
+      color: #5c6bc0;
+      font-size: 13px;
+      font-weight: 500;
+      text-shadow: 0 0 6px rgba(102, 126, 234, 0.15);
+      outline: none;
+      box-shadow: 0 1px 4px rgba(102, 126, 234, 0.15);
+      transition: border-color 0.3s, background 0.3s;
+    }
+    
+    .input-box::placeholder {
+      color: #9fa8da;
+    }
+    
+    .widget-wrapper.focused .ball {
+      background: linear-gradient(180deg, rgba(255, 193, 7, 0) 0%, rgba(255, 193, 7, 0.5) 40%, #ffc107 100%);
+      border-color: rgba(255, 255, 255, 0.35);
+      box-shadow: 0 0 20px rgba(255, 193, 7, 0.6),
+                  0 0 40px rgba(255, 193, 7, 0.3),
+                  0 4px 15px rgba(255, 193, 7, 0.5),
+                  inset 0 -3px 10px rgba(0,0,0,0.2),
+                  inset 0 3px 10px rgba(255,255,255,0.25);
+    }
+    
+    .widget-wrapper.focused .ripple {
+      border-color: rgba(255, 193, 7, 0.7);
+      box-shadow: 0 0 12px rgba(255, 193, 7, 0.4);
+    }
+    
+    .widget-wrapper.focused .input-box,
+    .widget-wrapper.focused .model-select {
+      border-color: rgba(255, 152, 0, 0.7);
+      background: rgba(255, 253, 245, 0.98);
+      box-shadow: 0 1px 4px rgba(255, 193, 7, 0.2);
+      color: #e65100;
+      text-shadow: 0 0 6px rgba(255, 193, 7, 0.2);
+    }
+    
+    .input-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .model-select {
+      width: 70px;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 14px;
+      border: 2px solid rgba(102, 126, 234, 0.65);
+      background: rgba(252, 252, 255, 0.96);
+      color: #5c6bc0;
+      font-size: 13px;
+      font-weight: 500;
+      text-shadow: 0 0 6px rgba(102, 126, 234, 0.15);
+      outline: none;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(102, 126, 234, 0.15);
+      transition: border-color 0.3s, background 0.3s;
+    }
+    
+    .model-select option {
+      background: #2d2d3a;
+      color: #e0e0e0;
+    }
+    
+    .display-box {
+      width: 178px;
+      max-height: 140px;
+      min-height: 60px;
+      display: none;
+      padding: 8px 12px;
+      border-radius: 12px;
+      border: 2px solid rgba(102, 126, 234, 0.65);
+      background: rgba(252, 252, 255, 0.96);
+      box-shadow: 0 1px 4px rgba(102, 126, 234, 0.15);
+      color: #5c6bc0;
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.5;
+      text-shadow: 0 0 6px rgba(102, 126, 234, 0.15);
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    
+    .display-box::-webkit-scrollbar {
+      width: 4px;
+    }
+    
+    .display-box::-webkit-scrollbar-track {
+      background: rgba(102, 126, 234, 0.1);
+      border-radius: 2px;
+    }
+    
+    .display-box::-webkit-scrollbar-thumb {
+      background: rgba(102, 126, 234, 0.4);
+      border-radius: 2px;
+    }
+    
+    .display-box.visible {
+      display: block;
+    }
+    
+    .msg-label {
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    
+    .msg-label.user { color: #5c6bc0; }
+    .msg-label.assistant { color: #7b1fa2; }
+    .msg-content { margin-bottom: 8px; }
+    .msg-content.thinking { color: #9fa8da; font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="widget-wrapper" id="widgetWrapper">
+  <div class="ball-container" id="dragArea">
+    <div class="ripple-wrapper" id="rippleWrapper">
+      <span class="ripple"></span>
+      <span class="ripple"></span>
+      <span class="ripple"></span>
+    </div>
+    <div class="ball" id="ball"></div>
+  </div>
+  <div class="input-row">
+    <select class="model-select" id="modelSelect">
+      <option value="qwen">qwen</option>
+      <option value="ollama">ollama</option>
+    </select>
+    <input type="text" class="input-box" id="inputBox" placeholder="输入内容...">
+  </div>
+  <div class="display-box" id="displayBox"></div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    const ball = document.getElementById('ball');
+    const rippleWrapper = document.getElementById('rippleWrapper');
+    const inputBox = document.getElementById('inputBox');
+    const modelSelect = document.getElementById('modelSelect');
+    const displayBox = document.getElementById('displayBox');
+    const widgetWrapper = document.getElementById('widgetWrapper');
+    
+    const TRIGGER_DISTANCE = 120;
+    
+    let chatHistory = [];
+    let rippleWasActive = false;
+    let isWaitingResponse = false;
+
+    inputBox.addEventListener('keydown', async (e) => {
+      if (e.key !== 'Enter') return;
+      const text = inputBox.value.trim();
+      if (!text || isWaitingResponse) return;
+
+      const model = modelSelect.value;
+      displayBox.classList.add('visible');
+
+      const userBlock = document.createElement('div');
+      userBlock.className = 'msg-content';
+      userBlock.innerHTML = '<div class="msg-label user">用户</div><div>' + escapeHtml(text) + '</div>';
+      displayBox.appendChild(userBlock);
+
+      const assistantBlock = document.createElement('div');
+      assistantBlock.className = 'msg-content';
+      assistantBlock.innerHTML = '<div class="msg-label assistant">助手</div><div class="assistant-text">正在思考中....</div>';
+      displayBox.appendChild(assistantBlock);
+
+      displayBox.scrollTop = displayBox.scrollHeight;
+      inputBox.value = '';
+      isWaitingResponse = true;
+
+      const assistantText = assistantBlock.querySelector('.assistant-text');
+      assistantText.classList.add('thinking');
+
+      let hasError = false;
+      const chunkHandler = (ev, chunk) => {
+        if (typeof chunk !== 'string') return;
+        assistantText.classList.remove('thinking');
+        if (assistantText.textContent === '正在思考中....') assistantText.textContent = '';
+        assistantText.textContent += chunk;
+        displayBox.scrollTop = displayBox.scrollHeight;
+      };
+      ipcRenderer.on('chat-chunk', chunkHandler);
+      ipcRenderer.once('chat-error', (ev, msg) => {
+        hasError = true;
+        ipcRenderer.removeListener('chat-chunk', chunkHandler);
+        assistantText.classList.remove('thinking');
+        assistantText.textContent = '错误: ' + (typeof msg === 'string' ? msg : String(msg));
+        isWaitingResponse = false;
+      });
+      ipcRenderer.once('chat-done', () => {
+        ipcRenderer.removeListener('chat-chunk', chunkHandler);
+        if (!hasError && assistantText.textContent !== '正在思考中....') {
+          chatHistory.push({ role: 'user', content: text });
+          chatHistory.push({ role: 'assistant', content: assistantText.textContent });
+        }
+        if (assistantText.textContent === '正在思考中....') {
+          assistantText.textContent = '(无响应)';
+          assistantText.classList.remove('thinking');
+        }
+        isWaitingResponse = false;
+      });
+
+      try {
+        const hist = chatHistory.slice(-10).map(m => ({ role: m.role, content: m.content }));
+        await ipcRenderer.invoke('chat-request', {
+          model,
+          userMessage: text,
+          history: hist,
+        });
+      } catch (err) {
+        ipcRenderer.removeListener('chat-chunk', chunkHandler);
+        assistantText.classList.remove('thinking');
+        assistantText.textContent = '请求失败: ' + (err?.message || '未知错误');
+        isWaitingResponse = false;
+      }
+    });
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+    
+    document.getElementById('ball').addEventListener('dblclick', () => {
+      displayBox.classList.toggle('visible');
+    });
+    
+    function updateFocusedState() {
+      const isFocused = document.activeElement === inputBox || document.activeElement === modelSelect;
+      if (isFocused) {
+        widgetWrapper.classList.add('focused');
+        rippleWrapper.classList.remove('active');
+        rippleWasActive = false;
+      } else {
+        widgetWrapper.classList.remove('focused');
+      }
+    }
+    inputBox.addEventListener('focus', updateFocusedState);
+    inputBox.addEventListener('blur', updateFocusedState);
+    modelSelect.addEventListener('focus', updateFocusedState);
+    modelSelect.addEventListener('blur', updateFocusedState);
+    
+    function getDistance(x1, y1, x2, y2) {
+      return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+    }
+    
+    function isMouseOverInputArea(mouseX, mouseY, bounds) {
+      const inInput = (el) => {
+        const rect = el.getBoundingClientRect();
+        const left = bounds.x + rect.left;
+        const top = bounds.y + rect.top;
+        const right = bounds.x + rect.right;
+        const bottom = bounds.y + rect.bottom;
+        return mouseX >= left && mouseX <= right && mouseY >= top && mouseY <= bottom;
+      };
+      return inInput(inputBox) || inInput(modelSelect);
+    }
+    
+    function isMouseOverInputAreaClient(clientX, clientY) {
+      const inEl = (el) => {
+        const rect = el.getBoundingClientRect();
+        return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+      };
+      return inEl(inputBox) || inEl(modelSelect);
+    }
+    
+    ipcRenderer.on('mouse-pos', (event, { x, y, bounds }) => {
+      const ballCenterX = bounds.x + bounds.width / 2;
+      const ballCenterY = bounds.y + bounds.height / 2;
+      const distance = getDistance(ballCenterX, ballCenterY, x, y);
+      const isInputFocused = document.activeElement === inputBox || document.activeElement === modelSelect;
+      const mouseOverInput = isMouseOverInputArea(x, y, bounds);
+      const suppressRipples = isInputFocused && mouseOverInput;
+      
+      if (!mouseOverInput && !isInputFocused) {
+        widgetWrapper.classList.remove('focused');
+      }
+      
+      if (distance < TRIGGER_DISTANCE) {
+        ball.classList.add('rotating');
+        if (!suppressRipples) {
+          if (!rippleWasActive) {
+            rippleWrapper.classList.remove('active');
+            void rippleWrapper.offsetWidth;
+            rippleWrapper.classList.add('active');
+          }
+          rippleWasActive = true;
+          rippleWrapper.classList.add('active');
+        } else {
+          rippleWrapper.classList.remove('active');
+          rippleWasActive = false;
+        }
+      } else {
+        ball.classList.remove('rotating');
+        rippleWrapper.classList.remove('active');
+        rippleWasActive = false;
+      }
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+      const isInputFocused = document.activeElement === inputBox || document.activeElement === modelSelect;
+      if (!isMouseOverInputAreaClient(e.clientX, e.clientY) && !isInputFocused) {
+        widgetWrapper.classList.remove('focused');
+      }
+    });
+    
+    let isDragging = false;
+    let lastX, lastY;
+    document.getElementById('dragArea').addEventListener('mousedown', (e) => {
+      isDragging = true;
+      lastX = e.screenX;
+      lastY = e.screenY;
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        ipcRenderer.send('window-move', { deltaX: e.screenX - lastX, deltaY: e.screenY - lastY });
+        lastX = e.screenX;
+        lastY = e.screenY;
+      }
+    });
+    document.addEventListener('mouseup', () => { isDragging = false; });
+  </script>
+</body>
+</html>
