@@ -1,5 +1,5 @@
 const { app, BrowserWindow, screen, ipcMain } = require('electron');
-const { callQwenOnline, callOllamaLocal } = require('./api');
+const { callQwenOnline, callOllamaLocal, callOllamaVision } = require('./api');
 
 let mainWindow;
 
@@ -38,7 +38,7 @@ function createWindow() {
     }
   });
 
-  ipcMain.handle('chat-request', async (e, { model, userMessage, history }) => {
+  ipcMain.handle('chat-request', async (e, { model, userMessage, history, images }) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     const errMsg = (err) => typeof err?.message === 'string' ? err.message : (err ? String(err) : '未知错误');
     const sendChunk = (text) => { if (typeof text === 'string' && text) win?.webContents.send('chat-chunk', text); };
@@ -56,6 +56,14 @@ function createWindow() {
           { role: 'user', content: userMessage },
         ];
         await callOllamaLocal(messages, sendChunk);
+      } else if (model === 'ollama-vl') {
+        const userMsg = { role: 'user', content: userMessage };
+        if (images && images.length) userMsg.images = images;
+        const messages = [
+          ...(history || []),
+          userMsg,
+        ];
+        await callOllamaVision(messages, sendChunk);
       } else {
         throw new Error('未知模型');
       }

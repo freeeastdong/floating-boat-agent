@@ -20,9 +20,45 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      overflow: visible;
     }
     
+    .mode-icon {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: bold;
+      color: #5c6bc0;
+      cursor: pointer;
+      transition: transform 0.2s, opacity 0.2s;
+      z-index: 20;
+      user-select: none;
+      pointer-events: auto;
+    }
+    .mode-icon:hover {
+      transform: scale(1.15);
+      opacity: 1;
+    }
+    .mode-icon.inactive {
+      opacity: 0.6;
+    }
+    .mode-icon.active {
+      opacity: 1;
+      box-shadow: 0 0 10px rgba(102, 126, 234, 0.6);
+      background: rgba(255, 255, 255, 0.35);
+      border: 1px solid rgba(102, 126, 234, 0.5);
+    }
+    .mode-icon-text { top: 0; right: 0; }
+    .mode-icon-vision { top: 0; left: 0; }
+    
     .ball {
+      position: relative;
+      z-index: 0;
       width: 60px;
       height: 60px;
       border-radius: 50%;
@@ -50,6 +86,7 @@
       width: 100%;
       height: 100%;
       pointer-events: none;
+      z-index: 1;
       opacity: 0;
       transition: opacity 0.3s ease;
     }
@@ -208,6 +245,11 @@
       display: block;
     }
     
+    .ball.drag-over {
+      outline: 2px dashed rgba(102, 126, 234, 0.8);
+      outline-offset: 2px;
+    }
+    
     .msg-label {
       font-weight: 600;
       margin-bottom: 2px;
@@ -217,11 +259,22 @@
     .msg-label.assistant { color: #7b1fa2; }
     .msg-content { margin-bottom: 8px; }
     .msg-content.thinking { color: #9fa8da; font-style: italic; }
+    
+    .msg-image {
+      max-width: 120px;
+      max-height: 80px;
+      border-radius: 6px;
+      margin: 4px 0;
+      object-fit: contain;
+      border: 1px solid rgba(102, 126, 234, 0.3);
+    }
   </style>
 </head>
 <body>
   <div class="widget-wrapper" id="widgetWrapper">
   <div class="ball-container" id="dragArea">
+    <div class="mode-icon mode-icon-text" id="modeIconText" title="文本模型">文</div>
+    <div class="mode-icon mode-icon-vision" id="modeIconVision" title="视觉模型">图</div>
     <div class="ripple-wrapper" id="rippleWrapper">
       <span class="ripple"></span>
       <span class="ripple"></span>
@@ -247,12 +300,42 @@
     const modelSelect = document.getElementById('modelSelect');
     const displayBox = document.getElementById('displayBox');
     const widgetWrapper = document.getElementById('widgetWrapper');
+    const modeIconText = document.getElementById('modeIconText');
+    const modeIconVision = document.getElementById('modeIconVision');
+    const dragArea = document.getElementById('dragArea');
     
     const TRIGGER_DISTANCE = 120;
+    const TEXT_MODELS = [
+      { value: 'qwen', label: 'qwen' },
+      { value: 'ollama', label: 'ollama' }
+    ];
+    const VISION_MODELS = [
+      { value: 'ollama-vl', label: 'qwen3-VL:8B' }
+    ];
     
     let chatHistory = [];
     let rippleWasActive = false;
     let isWaitingResponse = false;
+    let currentMode = 'text';
+    let pendingImages = [];
+    
+    function setMode(mode) {
+      currentMode = mode;
+      modeIconText.classList.toggle('active', mode === 'text');
+      modeIconText.classList.toggle('inactive', mode !== 'text');
+      modeIconVision.classList.toggle('active', mode === 'vision');
+      modeIconVision.classList.toggle('inactive', mode !== 'vision');
+      const opts = mode === 'text' ? TEXT_MODELS : VISION_MODELS;
+      modelSelect.innerHTML = opts.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+      modelSelect.value = opts[0].value;
+      inputBox.placeholder = mode === 'vision' ? '输入问题或拖拽图片到球体...' : '输入内容...';
+      if (mode === 'vision') pendingImages = [];
+    }
+    modeIconText.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); setMode('text'); });
+    modeIconVision.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); setMode('vision'); });
+    modeIconText.addEventListener('mousedown', (e) => e.stopPropagation());
+    modeIconVision.addEventListener('mousedown', (e) => e.stopPropagation());
+    setMode('text');
 
     inputBox.addEventListener('keydown', async (e) => {
       if (e.key !== 'Enter') return;
@@ -260,11 +343,18 @@
       if (!text || isWaitingResponse) return;
 
       const model = modelSelect.value;
+      const images = currentMode === 'vision' ? [...pendingImages] : [];
+      if (currentMode === 'vision') pendingImages = [];
+
       displayBox.classList.add('visible');
 
       const userBlock = document.createElement('div');
       userBlock.className = 'msg-content';
-      userBlock.innerHTML = '<div class="msg-label user">用户</div><div>' + escapeHtml(text) + '</div>';
+      let userHtml = '<div class="msg-label user">用户</div><div>' + escapeHtml(text) + '</div>';
+      if (images.length) {
+        userHtml += images.map(src => '<img class="msg-image" src="' + src + '" alt="图">').join('');
+      }
+      userBlock.innerHTML = userHtml;
       displayBox.appendChild(userBlock);
 
       const assistantBlock = document.createElement('div');
@@ -298,7 +388,9 @@
       ipcRenderer.once('chat-done', () => {
         ipcRenderer.removeListener('chat-chunk', chunkHandler);
         if (!hasError && assistantText.textContent !== '正在思考中....') {
-          chatHistory.push({ role: 'user', content: text });
+          const userMsg = { role: 'user', content: text };
+          if (images.length) userMsg.images = images;
+          chatHistory.push(userMsg);
           chatHistory.push({ role: 'assistant', content: assistantText.textContent });
         }
         if (assistantText.textContent === '正在思考中....') {
@@ -309,11 +401,16 @@
       });
 
       try {
-        const hist = chatHistory.slice(-10).map(m => ({ role: m.role, content: m.content }));
+        const hist = chatHistory.slice(-10).map(m => {
+          const h = { role: m.role, content: m.content };
+          if (m.images) h.images = m.images;
+          return h;
+        });
         await ipcRenderer.invoke('chat-request', {
           model,
           userMessage: text,
           history: hist,
+          images: images,
         });
       } catch (err) {
         ipcRenderer.removeListener('chat-chunk', chunkHandler);
@@ -428,6 +525,38 @@
       }
     });
     document.addEventListener('mouseup', () => { isDragging = false; });
+    
+    function toBase64DataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+    }
+    function toBase64Raw(dataUrl) {
+      const m = dataUrl.match(/^data:image\/[a-z]+;base64,(.+)$/i);
+      return m ? m[1] : dataUrl;
+    }
+    
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+      dragArea.addEventListener(ev, (e) => {
+        if (currentMode !== 'vision') return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (ev === 'dragenter' || ev === 'dragover') {
+          ball.classList.add('drag-over');
+        } else if (ev === 'drop') {
+          ball.classList.remove('drag-over');
+          const files = Array.from(e.dataTransfer?.files || []).filter(f => /^image\//.test(f.type));
+          Promise.all(files.map(toBase64DataUrl)).then(urls => {
+            pendingImages.push(...urls);
+          });
+        } else if (ev === 'dragleave') {
+          if (!dragArea.contains(e.relatedTarget)) ball.classList.remove('drag-over');
+        }
+      });
+    });
   </script>
 </body>
 </html>

@@ -75,6 +75,33 @@ async function callOllamaLocal(messages, onChunk) {
     stream: true,
   });
 
+  return ollamaRequest(body, onChunk, 'qwen3:4b');
+}
+
+function extractBase64(dataUrl) {
+  const m = (dataUrl || '').match(/^data:image\/[a-z]+;base64,(.+)$/i);
+  return m ? m[1] : dataUrl;
+}
+
+async function callOllamaVision(messages, onChunk) {
+  const msgs = (messages || []).map(m => {
+    const msg = { role: m.role, content: m.content || '' };
+    if (m.images && m.images.length) {
+      msg.images = m.images.map(extractBase64);
+    }
+    return msg;
+  });
+  const body = JSON.stringify({
+    model: 'qwen3-vl:8b',
+    messages: msgs,
+    stream: true,
+  });
+
+  return ollamaRequest(body, onChunk, 'qwen3-vl:8b');
+}
+
+async function ollamaRequest(body, onChunk, modelLabel) {
+
   return new Promise((resolve, reject) => {
     let buffer = '';
     const req = http.request({
@@ -90,7 +117,7 @@ async function callOllamaLocal(messages, onChunk) {
       if (res.statusCode !== 200) {
         let errData = '';
         res.on('data', c => errData += c);
-        res.on('end', () => reject(new Error(`Ollama 错误 ${res.statusCode}: 请确保本地已运行 Ollama 并拉取 qwen3:4b 模型`)));
+        res.on('end', () => reject(new Error(`Ollama 错误 ${res.statusCode}: 请确保本地已运行 Ollama 并拉取 ${modelLabel} 模型`)));
         return;
       }
       res.on('data', (chunk) => {
@@ -115,4 +142,4 @@ async function callOllamaLocal(messages, onChunk) {
   });
 }
 
-module.exports = { callQwenOnline, callOllamaLocal, getConfig };
+module.exports = { callQwenOnline, callOllamaLocal, callOllamaVision, getConfig };
