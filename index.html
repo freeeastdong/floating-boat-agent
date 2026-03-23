@@ -268,6 +268,52 @@
       object-fit: contain;
       border: 1px solid rgba(102, 126, 234, 0.3);
     }
+
+    .msg-row {
+      position: relative;
+      padding-right: 22px;
+      padding-bottom: 2px;
+    }
+    .msg-row .msg-text { display: block; }
+    .copy-btn {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .copy-btn:hover { opacity: 1; }
+    .copy-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+    .copy-btn .copy-tooltip {
+      position: absolute;
+      right: 100%;
+      bottom: 50%;
+      transform: translateY(50%);
+      margin-right: 4px;
+      padding: 2px 6px;
+      font-size: 11px;
+      white-space: nowrap;
+      background: rgba(92, 107, 192, 0.9);
+      color: #fff;
+      border-radius: 4px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .copy-btn:hover .copy-tooltip { opacity: 1; }
   </style>
 </head>
 <body>
@@ -348,21 +394,28 @@
 
       displayBox.classList.add('visible');
 
+      const copyIconSvg = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+
       const userBlock = document.createElement('div');
       userBlock.className = 'msg-content';
-      let userHtml = '<div class="msg-label user">用户</div><div>' + escapeHtml(text) + '</div>';
+      let userHtml = '<div class="msg-label user">用户：</div><div class="msg-row"><div class="msg-text"><span class="msg-copyable">' + escapeHtml(text) + '</span>';
       if (images.length) {
         userHtml += images.map(src => '<img class="msg-image" src="' + src + '" alt="图">').join('');
       }
+      userHtml += '</div><button class="copy-btn" title="复制"><span class="copy-tooltip">复制</span>' + copyIconSvg + '</button></div>';
       userBlock.innerHTML = userHtml;
       displayBox.appendChild(userBlock);
 
       const assistantBlock = document.createElement('div');
       assistantBlock.className = 'msg-content';
-      assistantBlock.innerHTML = '<div class="msg-label assistant">助手</div><div class="assistant-text">正在思考中....</div>';
+      assistantBlock.innerHTML = '<div class="msg-label assistant">助手：</div><div class="msg-row"><div class="assistant-text msg-copyable">正在思考中....</div><button class="copy-btn" title="复制"><span class="copy-tooltip">复制</span>' + copyIconSvg + '</button></div>';
       displayBox.appendChild(assistantBlock);
 
-      displayBox.scrollTop = displayBox.scrollHeight;
+      function scrollToBottom() {
+        displayBox.scrollTop = displayBox.scrollHeight;
+      }
+      scrollToBottom();
+      requestAnimationFrame(scrollToBottom);
       inputBox.value = '';
       isWaitingResponse = true;
 
@@ -428,6 +481,23 @@
     
     document.getElementById('ball').addEventListener('dblclick', () => {
       displayBox.classList.toggle('visible');
+    });
+
+    displayBox.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.copy-btn');
+      if (!btn) return;
+      const msgContent = btn.closest('.msg-content');
+      const copyable = msgContent?.querySelector('.msg-copyable');
+      if (!copyable) return;
+      const text = copyable.textContent.trim();
+      try {
+        await navigator.clipboard.writeText(text);
+        const oldTitle = btn.title;
+        btn.title = '已复制';
+        setTimeout(() => { btn.title = oldTitle; }, 800);
+      } catch (err) {
+        btn.title = '复制失败';
+      }
     });
     
     function updateFocusedState() {
